@@ -10,15 +10,50 @@ Docs: http://127.0.0.1:8000/docs
 Database config is read from environment variables (see database.py).
 """
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from sqlalchemy.orm import Session
-
+from fastapi.middleware.cors import CORSMiddleware
 from . import models
 from .database import engine, session
 from .schemas import Product
+import time
+
+import logging
+
+
+logging.basicConfig(
+    level = logging.basicConfig(
+        level = logging.INFO,
+         format="%(asctime)s — %(levelname)s — %(message)s"
+    )
+)
+
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins = ["http://localhost:3000"],
+    allow_credentials = True, # allowing all crendentials
+    allow_methods=["GET","POST","PUT","DELETE"],
+    allow_headers = ["*"]
+)
+
+@app.middleware("http")
+async def log_requests(request : Request, call_next) :
+    start = time.time()
+    response = await call_next(request)
+    
+    if response.status_code >=500:
+        logging.error(f"{request.method} {request.url} - {response.status_code}")
+    elif response.status_code>=400:
+        logging.warning(f"{request.method} {request.url} - {response.status_code}")
+    else :
+        logging.info(f"{request.method} {request.url} - {response.status_code}")
+        
+    return response
 # Create all tables defined in models.py (runs once at startup).
 models.Base.metadata.create_all(bind=engine)
 
