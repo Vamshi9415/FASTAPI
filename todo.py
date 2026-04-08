@@ -1,7 +1,9 @@
-from fastapi import FASTAPI 
-from pydantic import BaseModel, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel, Field
+from typing import Optional, List
+import time
 
-app = FASTAPI()
+app = FastAPI()
 
 # Create a simple endpoint /hello that returns "Hello, FastAPI!".
 @app.get("/hello")
@@ -10,8 +12,17 @@ def greet() :
 
 # Define an endpoint /items/{item_id} that returns the item ID.
 
+class product(BaseModel):
+    id: int
+    name: str
+    price: float
+
+products: List[product] = [
+    product(id=1, name="Sample Product", price=9.99)
+]
+
 @app.get("/product/{id}", response_model = product)
-def get_product_by_id(id):
+def get_product_by_id(id: int):
     for prod in products :
         if prod.id == id :
             return prod
@@ -34,7 +45,7 @@ def search(q : str):
 
 # BaseModel is a Pydantic class used in FastAPI to define and validate request/response
 # data structures. It ensures type safety, automatic validation, and clean integration
-# with FastAPI’s auto-generated documentation.”
+# with FastAPI's auto-generated documentation."
 class User(BaseModel):
     name : str
     age :int
@@ -87,7 +98,7 @@ def create_user(user : UserModel):
 def validate_age(user : UserModel):
     #if age passes validation, return success
     
-    return { "message" : f"Age validated for {user.age}}
+    return { "message" : f"Age validated for {user.age}"}
     #here no need to raise an exceptions because pydantic handles it
 
 
@@ -120,8 +131,8 @@ def get_secure_data(token : str = Depends(authenticate_user)):
 # Raises HTTPException if not valid.
 # Depends(authenticate_user)
 
-# Tells FastAPI: “Before running get_secure_data, run authenticate_user and inject its result.”
-# If authentication fails, the endpoint won’t execute.
+# Tells FastAPI: "Before running get_secure_data, run authenticate_user and inject its result."
+# If authentication fails, the endpoint won't execute.
 # Endpoint (/secure-data/)
 # Only accessible if the dependency passes.
 # Returns a success message and the token.
@@ -138,7 +149,6 @@ class Book(BaseModel):
     id : int
     title : str
     author : str 
-from typing import List 
 
 books : List[Book] = []
 
@@ -160,8 +170,8 @@ def add_book(book : Book):
 def update_book(id : int, update_book : Book):
     for index,b in enumerate(books) :
         if b.id == id :
-            deleted_book = books.pop(index)
-            return {"message" : "Book deleted successfully","book" : deleted_book}
+            books[index] = update_book
+            return {"message" : "Book updated successfully", "book" : update_book}
     raise HTTPException(status_code = 404, detail = "Book Not Found")
     
 
@@ -202,35 +212,57 @@ async def log_requests(request : Request, call_next):
     
     return response 
 
-@app.get("/hello")
-def hello():
-    return "hello"
-
 # Origin = combination of scheme (http/https), domain, and port.
 # Example:
-
 # https://example.com:443 → one origin
-
 # http://example.com:80 → different origin (because of scheme/port).
 
 # Why CORS exists:  
 # Browsers block cross-origin requests by default to prevent malicious sites from stealing data from another site.
-
 # Server-side role:
-
 # The server decides whether to allow requests from other origins by sending special HTTP headers (like Access-Control-Allow-Origin).
-
 # If the server includes the right CORS headers, the browser allows the request.
-
 # If not, the browser blocks it.
-
 # So yes — CORS is enforced by the browser, but controlled by the server. The check happens client-side (browser), but the server must explicitly permit or deny cross-origin access.
 
 # Static Files
 # Serve a static folder (e.g., /static) with images or CSS.
 # Access via http://localhost:8000/static/filename.
 
+# to access the static files in fastapi use StaticFiles class from fastapi.staticfiles and mount it to a path, so that through localhost we can access it
+
+from fastapi.staticfiles import StaticFiles
+import os
+
+#mount the static directory
+
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"),name = "static")
+
+@app.get("/")
+def root():
+    return {"message" : "Go to /static/file_name to access static files" }
+
+
 
 # Simple Authentication
 # Create a login endpoint that accepts username/password.
 # Return a fake JWT token (string) for practice.
+
+class LoginRequest(BaseModel):
+    username : str 
+    password : str 
+
+@app.post("/login")
+def login(request : LoginRequest) :
+    
+    #dummy check 
+    if request.username == "username" and request.password == "password" :
+        fake_token = "fake_jwt_token"
+        
+        return {
+            "Acess-token" : fake_token ,
+            "token_type " : "bearer"
+        }
+    else :
+        raise HTTPException(status_code = 401, detail =" INvalid Username ot password")
